@@ -5,16 +5,30 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"sort"
 	"strconv"
 	"time"
 )
+
+type card struct {
+	// Used for deciding if this card is identical to others
+	id int
+	// This card's position in the future, shuffled deck
+	position int
+}
 
 func badArgument(err error) {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 	}
-	fmt.Fprintln(os.Stderr, "shuffle must have 1 or 2 integer arguments")
+	fmt.Fprintln(os.Stderr,
+		"shuffle must have at least 1 argument, all of them integers")
 	os.Exit(1)
+}
+
+// true means pile A. false means pile B.
+func whichPile(c card, median int) bool {
+	return c.position < median
 }
 
 func main() {
@@ -22,44 +36,101 @@ func main() {
 		"Random number seed. Default is the current time.")
 	flag.Parse()
 
-	rand.Seed(*seed)
-
 	if flag.NArg() < 1 {
 		badArgument(nil)
 	}
-	// n is the total number of cards
-	n, err := strconv.Atoi(flag.Arg(0))
+	// The number of unique, unshuffled cards
+	uniqueCards, err := strconv.Atoi(flag.Arg(0))
 	if err != nil {
 		badArgument(err)
 	}
 
-	// nonRandomCards is the number of cards that are not yet randomized
-	nonRandomCards := n
-	if flag.NArg() > 1 {
-		nonRandomCards, err = strconv.Atoi(flag.Arg(1))
+	// A slice of numbers of identical or pre-shuffled cards
+	identicalGroups := make([]int, flag.NArg()-1)
+	for i, nStr := range flag.Args()[1:] {
+		identicalGroups[i], err = strconv.Atoi(nStr)
 		if err != nil {
 			badArgument(err)
 		}
 	}
-	// The number of cards to move from the random pile
-	cardsToMove := 0
 
-	for ; n > 0; n-- {
-		card := rand.Intn(n)
-		if card < nonRandomCards {
-			if cardsToMove > 0 {
-				fmt.Printf("Take %d cards.", cardsToMove)
-				cardsToMove = 0
-				fmt.Scanln()
-			}
-			nonRandomCards--
-			fmt.Printf("%2d %2d", card, nonRandomCards-card)
-			fmt.Scanln()
-		} else {
-			cardsToMove++
+	deckSize := uniqueCards
+	for _, n := range identicalGroups {
+		deckSize += n
+	}
+
+	positions := rand.New(rand.NewSource(*seed)).Perm(deckSize)
+
+	// The initial deck. The end of the slice represents the top of the pile.
+	deck := make([]card, uniqueCards)
+	id := 0
+	for ; id < uniqueCards; id++ {
+		deck[id] = card{id, positions[id]}
+	}
+	positions = positions[uniqueCards:]
+	for _, n := range identicalGroups {
+		id++
+		sort.Ints(positions[:n])
+		for i := 0; i < n; i++ {
+			deck = append(deck, card{id, positions[0]})
+			positions = positions[1:]
 		}
 	}
 
-	// Make sure we have the correct number of cards left.
-	fmt.Printf("%2d cards left.\n", cardsToMove)
+	piles := [][]card{deck}
+
+	for len(piles) > 0 {
+		lastI := len(piles) - 1
+		hand := piles[lastI]
+		piles = piles[:lastI]
+		if len(hand) > 1 {
+			fmt.Printf("Take pile of %d cards.\n", len(hand))
+			allSame := true
+			for _, c := range hand {
+				if c.id != hand[0].id {
+					allSame = false
+					break
+				}
+			}
+			if allSame {
+				fmt.Println("This pile is already shuffled.")
+			} else {
+				min := deckSize
+				max := 0
+				for _, c := range hand {
+					if c.position < min {
+						min = c.position
+					}
+					if c.position > max {
+						max = c.position
+					}
+				}
+				median := (min + max + 1) / 2
+				pileA := []card{}
+				pileB := []card{}
+				for len(hand) > 0 {
+					i := len(hand) - 1
+					newPile := whichPile(hand[i], median)
+					for ; i >= 0 && whichPile(hand[i], median) == newPile; i-- {
+					}
+					i++
+					transfer := hand[i:]
+					hand = hand[:i]
+					var pile *[]card
+					var pileName byte
+					if newPile {
+						pileName = 'A'
+						pile = &pileA
+					} else {
+						pileName = 'B'
+						pile = &pileB
+					}
+					fmt.Printf("%d to %c", len(transfer), pileName)
+					*pile = append(*pile, transfer...)
+					fmt.Scanln()
+				}
+				piles = append(piles, pileB, pileA)
+			}
+		}
+	}
 }
