@@ -116,14 +116,11 @@ func main() {
 					i++
 					transfer := hand[i:]
 					hand = hand[:i]
-					var pile *[]card
-					var pileName byte
+					pile := &pileB
+					pileName := 'B'
 					if newPile {
-						pileName = 'A'
 						pile = &pileA
-					} else {
-						pileName = 'B'
-						pile = &pileB
+						pileName = 'A'
 					}
 					fmt.Printf("%d to %c", len(transfer), pileName)
 					*pile = append(*pile, transfer...)
