@@ -31,6 +31,17 @@ func whichPile(c card, median int) bool {
 	return c.position < median
 }
 
+// Returns true if the positions in the pile are in consecutive ascending order,
+// otherwise false.
+func inOrder(pile []card) bool {
+	for i, c := range pile[:len(pile)-1] {
+		if c.position != pile[i+1].position-1 {
+			return false
+		}
+	}
+	return true
+}
+
 func main() {
 	seed := flag.Int64("s", time.Now().Unix(),
 		"Random number seed. Default is the current time.")
@@ -85,14 +96,7 @@ func main() {
 		piles = piles[:lastI]
 		if len(hand) > 1 {
 			fmt.Printf("Take pile of %d cards.\n", len(hand))
-			allSame := true
-			for _, c := range hand {
-				if c.id != hand[0].id {
-					allSame = false
-					break
-				}
-			}
-			if allSame {
+			if inOrder(hand) {
 				fmt.Println("This pile is already shuffled.")
 			} else {
 				min := deckSize
