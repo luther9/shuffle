@@ -4,9 +4,12 @@ An aid for randomizing a physical deck of cards.
 
 ## Usage
 
-`shuffle N`
+`shuffle UNIQUE [GROUP...]`
 
-N is the number of cards in the deck.
+All non-option arguments must be integers. UNIQUE is the number of unique,
+unshuffled cards. The GROUPs are numbers of identical or pre-shuffled cards.
+When stacking the initial deck, arrange the cards specified by the arguments
+from the bottom up.
 
 The program will tell you how to divide the deck into two equal halves, called A
 and B. You will see something like "2 to A", which means to put 2 cards from the
