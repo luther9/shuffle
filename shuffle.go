@@ -1,3 +1,7 @@
+/*
+2017 Luther Thompson. This program is public domain. See COPYING for details.
+*/
+
 package main
 
 import (
