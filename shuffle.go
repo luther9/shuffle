@@ -14,13 +14,6 @@ import (
 	"time"
 )
 
-type card struct {
-	// Used for deciding if this card is identical to others
-	id int
-	// This card's position in the future, shuffled deck
-	position int
-}
-
 func badArgument(err error) {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -30,20 +23,29 @@ func badArgument(err error) {
 	os.Exit(1)
 }
 
-// true means pile A. false means pile B.
-func whichPile(c card, median int) bool {
-	return c.position < median
-}
-
-// Returns true if the positions in the pile are in consecutive ascending order,
-// otherwise false.
-func inOrder(pile []card) bool {
-	for i, c := range pile[:len(pile)-1] {
-		if c.position != pile[i+1].position-1 {
-			return false
-		}
+// Return a slice of integers representing the original state of the physical
+// deck. The integers themselves represent the positions of the cards in the
+// final, shuffled deck. seed is the random number seed. unique is the number of
+// unique, unshuffled cards. groups is a slice of numbers of identical or pre-
+// shuffled cards.
+//
+// This function is the only place in the program where we use an RNG, so we
+// initialize it here.
+func newDeck(seed int64, unique int, groups []int) sort.IntSlice {
+	size := unique
+	for _, n := range groups {
+		size += n
 	}
-	return true
+
+	deck := sort.IntSlice(rand.New(rand.NewSource(seed)).Perm(size))
+
+	i := unique
+	for _, n := range groups {
+		deck[i : i+n].Sort()
+		i += n
+	}
+
+	return deck
 }
 
 func main() {
@@ -69,30 +71,7 @@ func main() {
 		}
 	}
 
-	deckSize := uniqueCards
-	for _, n := range identicalGroups {
-		deckSize += n
-	}
-
-	positions := rand.New(rand.NewSource(*seed)).Perm(deckSize)
-
-	// The initial deck. The end of the slice represents the top of the pile.
-	deck := make([]card, uniqueCards)
-	id := 0
-	for ; id < uniqueCards; id++ {
-		deck[id] = card{id, positions[id]}
-	}
-	positions = positions[uniqueCards:]
-	for _, n := range identicalGroups {
-		id++
-		sort.Ints(positions[:n])
-		for i := 0; i < n; i++ {
-			deck = append(deck, card{id, positions[0]})
-			positions = positions[1:]
-		}
-	}
-
-	piles := [][]card{deck}
+	piles := []sort.IntSlice{newDeck(*seed, uniqueCards, identicalGroups)}
 
 	for len(piles) > 0 {
 		lastI := len(piles) - 1
@@ -100,26 +79,26 @@ func main() {
 		piles = piles[:lastI]
 		if len(hand) > 1 {
 			fmt.Printf("Take pile of %d cards.\n", len(hand))
-			if inOrder(hand) {
+			if sort.IsSorted(hand) {
 				fmt.Println("This pile is already shuffled.")
 			} else {
-				min := deckSize
-				max := 0
+				min := hand[0]
+				max := min
 				for _, c := range hand {
-					if c.position < min {
-						min = c.position
+					if c < min {
+						min = c
 					}
-					if c.position > max {
-						max = c.position
+					if c > max {
+						max = c
 					}
 				}
 				median := (min + max + 1) / 2
-				pileA := []card{}
-				pileB := []card{}
+				pileA := sort.IntSlice{}
+				pileB := sort.IntSlice{}
 				for len(hand) > 0 {
 					i := len(hand) - 1
-					newPile := whichPile(hand[i], median)
-					for ; i >= 0 && whichPile(hand[i], median) == newPile; i-- {
+					newPile := hand[i] < median
+					for ; i >= 0 && hand[i] < median == newPile; i-- {
 					}
 					i++
 					transfer := hand[i:]
